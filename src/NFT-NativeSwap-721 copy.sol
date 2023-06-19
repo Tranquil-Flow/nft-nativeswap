@@ -4,15 +4,18 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
 
     /*
     TO-DO
      - Add deadlines to proposals 
      - Add option to trade any token (ERC20, ERC721 + ERC1155)
+     - Reentrancy Guard can be removed?
     */
 
-contract NFTNativeSwap721 is ERC721, ReentrancyGuard {
+contract NFTNativeSwap721 is ERC721, Ownable, ReentrancyGuard {
     
     struct TradeOffers {
         address token;
@@ -27,6 +30,11 @@ contract NFTNativeSwap721 is ERC721, ReentrancyGuard {
         string memory name_,
         string memory symbol_
     ) ERC721(name_, symbol_) {
+    }
+
+    // For testing purposes
+    function safeMint(address to, uint256 tokenId) public onlyOwner {
+        _safeMint(to, tokenId);
     }
 
     // Function for potential buyer to propose a trade on a specified NFT
@@ -47,11 +55,12 @@ contract NFTNativeSwap721 is ERC721, ReentrancyGuard {
         uint tokenID,
         uint proposalID
     ) public nonReentrant {
-        
+        address nftOwner = ownerOf(tokenID);
+        require(msg.sender == nftOwner, "Caller is not the owner of the NFT");
         TradeOffers memory acceptedTrade = offersByID[tokenID][proposalID];
-
-        IERC20(acceptedTrade.token).transferFrom(address(this),###,acceptedTrade.amount)
-
+        
+        IERC20(acceptedTrade.token).transferFrom(address(this), nftOwner, acceptedTrade.amount);
+        safeTransferFrom(nftOwner, acceptedTrade.proposer, tokenID);
 
         offersByID[tokenID][proposalID] = TradeOffers(
             address(0),
